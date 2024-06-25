@@ -40,7 +40,7 @@ export default defineComponent({
         const sheetName = workbook.SheetNames[0]
         const worksheet = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName])
         localStorage.setItem('productList', JSON.stringify(worksheet))
-        $q.notify({ message: 'Lista cargada exitosamente', type: 'positive',timeout: 500 })
+        $q.notify({ message: 'Lista cargada exitosamente', type: 'positive', timeout: 1000 })
         router.push('/product-list')
       }
       reader.readAsArrayBuffer(file)

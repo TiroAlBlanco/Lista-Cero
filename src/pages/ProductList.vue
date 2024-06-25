@@ -32,23 +32,26 @@
 </template>
 
 <script>
-import { defineComponent, ref, onMounted, onBeforeUnmount } from 'vue'
+import { defineComponent, ref, onMounted, onBeforeUnmount, watch } from 'vue'
 import { useQuasar } from 'quasar'
+import { useRouter } from 'vue-router'
 
 export default defineComponent({
   name: 'ProductList',
   setup() {
     const $q = useQuasar()
+    const router = useRouter()
     const products = ref([])
     const columns = ref([])
     const highlightedRows = ref([])
 
-    onMounted(() => {
+    const loadProducts = () => {
       const productList = JSON.parse(localStorage.getItem('productList'))
+      const savedHighlightedRows = JSON.parse(localStorage.getItem('highlightedRows'))
+
       if (productList && productList.length > 0) {
         products.value = productList
 
-        // Obtener los encabezados de las columnas dinámicamente
         const keys = Object.keys(productList[0])
         columns.value = keys.map(key => ({
           name: key,
@@ -58,6 +61,13 @@ export default defineComponent({
         }))
       }
 
+      if (savedHighlightedRows) {
+        highlightedRows.value = savedHighlightedRows.map(row => products.value.find(product => product['Código EAN/UPC'] === row['Código EAN/UPC']))
+      }
+    }
+
+    onMounted(() => {
+      loadProducts()
       document.addEventListener('backbutton', onBackButton, false)
     })
 
@@ -65,67 +75,131 @@ export default defineComponent({
       document.removeEventListener('backbutton', onBackButton, false)
     })
 
+    watch(highlightedRows, (newVal) => {
+      localStorage.setItem('highlightedRows', JSON.stringify(newVal.map(row => ({
+        'Código EAN/UPC': row['Código EAN/UPC']
+      }))))
+    }, { deep: true })
+
+    // const scanBarcode = () => {
+    //   if (window.cordova && window.cordova.plugins && window.cordova.plugins.barcodeScanner) {
+    //     window.cordova.plugins.barcodeScanner.scan(
+    //       (result) => {
+    //         if (!result.cancelled) {
+    //           const scannedCode = result.text.trim()
+    //           const product = products.value.find(p => String(p['Código EAN/UPC']).trim() === scannedCode)
+    //           if (product) {
+    //             highlightedRows.value.push(product)
+    //             localStorage.setItem('highlightedRows', JSON.stringify(highlightedRows.value.map(row => ({
+    //               'Código EAN/UPC': row['Código EAN/UPC']
+    //             }))))
+    //             $q.notify({
+    //               type: 'positive',
+    //               message: `El código ${scannedCode} está en la lista y tienes que tomar ${product.A001} unidades.`
+    //             })
+    //           } else {
+    //             $q.notify({
+    //               type: 'negative',
+    //               message: 'Producto no encontrado'
+    //             })
+    //           }
+    //         }
+    //       },
+    //       (error) => {
+    //         $q.notify({
+    //           type: 'negative',
+    //           message: 'Error al escanear el código de barras'
+    //         })
+    //       },
+    //       {
+    //         preferFrontCamera: false,
+    //         showFlipCameraButton: true,
+    //         showTorchButton: true,
+    //         torchOn: false,
+    //         saveHistory: true,
+    //         prompt: "Coloca el código de barras dentro del área de escaneo",
+    //         resultDisplayDuration: 500,
+    //         formats: "EAN_8,EAN_13,EAN_14,UPC_A,UPC_E,CODE_39,CODE_93,CODE_128,CODABAR,ITF,QR_CODE,DATA_MATRIX,PDF_417,AZTEC",
+    //         orientation: "portrait",
+    //         disableAnimations: true,
+    //         disableSuccessBeep: false
+    //       }
+    //     )
+    //   } else {
+    //     $q.notify({
+    //       type: 'negative',
+    //       message: 'Barcode scanner no está disponible'
+    //     })
+    //   }
+    // }
     const scanBarcode = () => {
-      if (window.cordova && window.cordova.plugins && window.cordova.plugins.barcodeScanner) {
-        window.cordova.plugins.barcodeScanner.scan(
-          (result) => {
-            if (!result.cancelled) {
-              const scannedCode = result.text.trim()
-              const product = products.value.find(p => String(p['Código EAN/UPC']).trim() === scannedCode)
-              if (product) {
-                highlightedRows.value.push(product)
-                $q.notify({
-                  type: 'positive',
-                  message: `El código ${scannedCode} está en la lista y tienes que tomar ${product.A007} unidades.`
-                })
-              } else {
-                $q.notify({
-                  type: 'negative',
-                  message: 'Producto no encontrado'
-                })
-              }
-            }
-          },
-          (error) => {
+  if (window.cordova && window.cordova.plugins && window.cordova.plugins.barcodeScanner) {
+    window.cordova.plugins.barcodeScanner.scan(
+      (result) => {
+        if (!result.cancelled) {
+          const scannedCode = result.text.trim();
+          const product = products.value.find(p => String(p['Código EAN/UPC']).trim() === scannedCode);
+          if (product) {
+            highlightedRows.value.push(product);
+            localStorage.setItem('highlightedRows', JSON.stringify(highlightedRows.value.map(row => ({
+              'Código EAN/UPC': row['Código EAN/UPC']
+            }))));
+            $q.notify({
+              type: 'positive',
+              message: `El código ${scannedCode} está en la lista y tienes que tomar ${product.A001} unidades.`
+            });
+          } else {
             $q.notify({
               type: 'negative',
-              message: 'Error al escanear el código de barras'
-            })
-          },
-          {
-            preferFrontCamera: false, // Use the back camera
-            showFlipCameraButton: true, // Show flip camera button
-            showTorchButton: true, // Show torch button
-            torchOn: false, // Start with the torch off
-            saveHistory: true, // Save scan history
-            prompt: "Coloca el código de barras dentro del área de escaneo", // Android
-            resultDisplayDuration: 500, // Milliseconds to display scanned text
-            formats: "EAN_13", // Default: all but PDF_417 and RSS_EXPANDED
-            orientation: "portrait", // Android only (portrait|landscape), default unset so it rotates with the device
-            disableAnimations: true, // iOS
-            disableSuccessBeep: false // iOS and Android
+              message: 'Producto no encontrado'
+            });
           }
-        )
-      } else {
+        }
+      },
+      (error) => {
         $q.notify({
           type: 'negative',
-          message: 'Barcode scanner no está disponible'
-        })
+          message: 'Error al escanear el código de barras'
+        });
+      },
+      {
+        preferFrontCamera: false,
+        showFlipCameraButton: true,
+        showTorchButton: true,
+        torchOn: false,
+        saveHistory: true,
+        prompt: "Coloca el código de barras dentro del área de escaneo",
+        resultDisplayDuration: 500,
+        formats: "EAN_13,EAN_8,EAN_14,UPC_A,UPC_E,CODE_39,CODE_93,CODE_128,CODABAR,ITF,QR_CODE,DATA_MATRIX,PDF_417,AZTEC",
+        orientation: "portrait",
+        disableAnimations: true,
+        disableSuccessBeep: false
       }
-    }
+    );
+  } else {
+    $q.notify({
+      type: 'negative',
+      message: 'Barcode scanner no está disponible'
+    });
+  }
+};
 
     const onBackButton = (event) => {
       event.preventDefault()
-      navigator.notification.confirm(
-        '¿Estás seguro de salirte de la lista?',
-        (buttonIndex) => {
-          if (buttonIndex === 1) {
-            history.back()  // Usar history.back() para retroceder
-          }
-        },
-        'Confirmar',
-        ['Sí', 'No']
-      )
+      $q.dialog({
+        title: 'Confirmar',
+        message: '¿Estás seguro de salirte de la lista?',
+        cancel: true,
+        persistent: true
+      }).onOk(() => {
+        localStorage.removeItem('highlightedRows')
+        router.push('/')
+      }).onCancel(() => {
+        // Aquí aseguramos que la lista se recargue correctamente
+        loadProducts()
+        // Volver a la página de ProductList.vue sin perder el estado
+        router.push({ path: '/product-list' })
+      })
     }
 
     const isHighlighted = (row) => {
@@ -166,6 +240,6 @@ export default defineComponent({
   margin-bottom: 16px;
 }
 .highlight {
-  background-color: yellow !important;
+  background-color: rgb(59, 241, 68) !important;
 }
 </style>
